@@ -214,6 +214,7 @@ def gerarGraficoEvolucao(dados):
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.savefig(os.path.join("output", "evolucao_precos.png"))
+    plt.show()  # Abre a interface interativa
     plt.close()
 
 
@@ -273,6 +274,7 @@ def gerarGraficoInflacao(dados):
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(os.path.join("output", "ajuste_inflacao.png"))
+    plt.show()  # Abre a interface interativa
     plt.close()
 
 
@@ -310,6 +312,7 @@ def gerarGraficoDispersao(dados):
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.savefig(os.path.join("output", "correlacao_dispersao.png"))
+    plt.show()  # Abre a interface interativa
     plt.close()
 
 
@@ -343,6 +346,7 @@ def gerarBoxPlot(dados):
     plt.ylabel("Preço Ajustado (R$)", fontsize=12)
     plt.tight_layout()
     plt.savefig(os.path.join("output", "boxplot_outliers.png"))
+    plt.show()  # Abre a interface interativa
     plt.close()
 
 # -----------------------------------------------------------------------------------

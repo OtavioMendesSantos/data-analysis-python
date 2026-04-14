@@ -1,6 +1,6 @@
 # Análise de Preços de Combustíveis no Brasil
 
-Este projeto realiza a coleta e análise exploratória de dados sobre os preços de combustíveis no Brasil, utilizando a biblioteca `kagglehub` para baixar os datasets diretamente do Kaggle.
+Este projeto realiza a coleta, tratamento e análise exploratória de dados sobre os preços de combustíveis no Brasil, utilizando a biblioteca `kagglehub` para baixar os datasets diretamente do Kaggle e `matplotlib` para visualização.
 
 ## 🚀 Como Executar o Projeto
 
@@ -24,21 +24,12 @@ python -m venv .venv
 Agora, ative o ambiente virtual:
 
 - **Linux/macOS:**
-
   ```bash
   source .venv/bin/activate
   ```
-
 - **Windows (PowerShell):**
-
   ```powershell
   .\.venv\Scripts\Activate.ps1
-  ```
-
-- **Windows (CMD):**
-
-  ```cmd
-  .\.venv\Scripts\activate.bat
   ```
 
 ### 3. Instalar Dependências
@@ -51,13 +42,25 @@ pip install -r requirements.txt
 
 ### 4. Executar a Análise
 
-Para rodar o script principal e visualizar os primeiros registros dos dados de combustíveis:
+Para rodar o script principal:
 
 ```bash
 python main.py
 ```
 
-## 📊 Dados Utilizados
+## 📊 Funcionalidades e Análises
+
+O script `main.py` está estruturado em funções para garantir a organização do fluxo de dados:
+
+1.  **Carga de Dados:** Download automático do dataset `combustiveis-brasil.csv` via `kagglehub`.
+2.  **Tratamento:** Limpeza de nulos, normalização de colunas e criação de séries temporais.
+3.  **Análise Estatística:**
+    *   Cálculo da média de preços de revenda (Mín/Máx).
+    *   Aumento total acumulado no período.
+    *   Identificação dos meses com maior e menor variação de preços.
+4.  **Visualização:** Geração de um gráfico de linha comparativo entre Gasolina e Diesel, salvo automaticamente como `evolucao_precos.png`.
+
+## 📂 Dados Utilizados
 
 O projeto consome o dataset [fidelissauro/combustiveis-brasil](https://www.kaggle.com/datasets/fidelissauro/combustiveis-brasil) via `kagglehub`.
 

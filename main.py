@@ -1,23 +1,29 @@
+import os
 import kagglehub
-import matplotlib.pyplot as plt  # Matplotlib é uma biblioteca de visualização de dados em Python. O módulo pyplot (apelidado de plt) é a parte que você usa para criar gráficos
-import pandas as pd  # engenharia de dados
+import matplotlib.pyplot as plt
+import pandas as pd
 from kagglehub import KaggleDatasetAdapter
 
 
-# carregar o arquivo usando kagglehub
+# -----------------------------------------------------------------------------------
+# FUNÇÃO 1: CARGA DE DADOS (DATA INGESTION)
+# Explicação para Apresentação:
+# "Utilizamos o kagglehub para garantir que o projeto sempre consuma a versão mais recente
+# do dataset oficial, eliminando a necessidade de baixar arquivos manuais (.csv)."
+# -----------------------------------------------------------------------------------
 def carregarArquivo(nomeArquivo):
-    print(f"carga de arquivo: {nomeArquivo} via kagglehub")
+    print(f"Iniciando ingestão de dados: {nomeArquivo} via Kaggle API...")
     dados = None
     try:
-        # Carregando a última versão utilizando a função atualizada
         dados = kagglehub.dataset_load(
             KaggleDatasetAdapter.PANDAS,
             "fidelissauro/combustiveis-brasil",
             nomeArquivo,
         )
 
-        # Normalização básica de nomes de colunas (removendo acentos e convertendo para minúsculas)
-        # para garantir compatibilidade com o código de tratamento
+        # PONTO CHAVE: Normalização de metadados.
+        # " datasets públicos costumam ter acentos e espaços nos nomes das colunas.
+        #   Normalizamos tudo para minúsculo e sem acentos para evitar erros de sintaxe futuros."
         dados.columns = (
             dados.columns.str.normalize("NFKD")
             .str.encode("ascii", errors="ignore")
@@ -26,26 +32,24 @@ def carregarArquivo(nomeArquivo):
         )
 
     except Exception as e:
-        print(f"Não foi possivel carregar o arquivo: {e}")
+        print(f"Erro na carga de dados: {e}")
 
     return dados
 
 
-# tratamento do arquivo
+# -----------------------------------------------------------------------------------
+# FUNÇÃO 2: TRATAMENTO (DATA WRANGLING)
+# Explicação para Apresentação:
+# "Dados crus raramente estão prontos para análise. Aqui fazemos o 'Slicing' (recorte)
+# apenas do que importa e transformamos tipos de dados genéricos em Séries Temporais."
+# -----------------------------------------------------------------------------------
 def tratamentoArquivo(dados):
     if dados is None:
         return None
 
-    print("tratamento do arquivo")
+    print("Iniciando tratamento e limpeza de dados...")
 
-    # descricao basica do arquivo
-    print(dados.info())
-    print(dados.head())
-    print(dados.tail())
-    print(dados.describe())
-
-    # manter somente as colunas desejadas
-    # nota: nomes de colunas já foram normalizados para minúsculas em carregarArquivo
+    # 1. Filtro de Escopo: Focamos apenas em colunas de Preço de Revenda (consumidor final).
     colunas_desejadas = [
         "ano",
         "mes",
@@ -55,88 +59,114 @@ def tratamentoArquivo(dados):
         "oleo_diesel_preco_revenda_max",
     ]
 
-    # Verifica se as colunas existem antes de filtrar
     colunas_presentes = [col for col in colunas_desejadas if col in dados.columns]
     dados = dados[colunas_presentes]
 
-    # remover nulos
+    # 2. Limpeza: Removemos registros incompletos para não distorcer as médias.
     dados.dropna(inplace=True)
 
-    # criar coluna de data
+    # 3. Engenharia de Atributos (Data Transformation):
+    # "Transformamos as colunas separadas de 'ano' e 'mês' em um objeto Datetime legítimo do Pandas.
+    # Isso permite que o Python entenda a cronologia e faça ordenações temporais precisas."
     if "ano" in dados.columns and "mes" in dados.columns:
-        # Criar um DataFrame auxiliar para garantir a compatibilidade com pd.to_datetime
         df_data = pd.DataFrame({"year": dados["ano"], "month": dados["mes"], "day": 1})
         dados["data"] = pd.to_datetime(df_data)
-
-        # ordenar
-        dados.sort_values("data", inplace=True)
-
-    print(dados.info())
-    print(dados.shape)
+        dados.sort_values(
+            "data", inplace=True
+        )  # Garante que o gráfico siga a linha do tempo.
 
     return dados
 
 
-# analise de dados
+# -----------------------------------------------------------------------------------
+# FUNÇÃO 3: ANÁLISE E INSIGHTS (DATA ANALYTICS)
+# Explicação para Apresentação:
+# "Aqui transformamos dados em informação. Calculamos a inflação dos combustíveis
+# no período e identificamos picos históricos de variação (volatilidade)."
+# -----------------------------------------------------------------------------------
 def analiseDados(dados):
     if dados is None:
         return
 
-    print("analise do arquivo")
+    print("Gerando indicadores e visualizações...")
 
-    # criar média dos preços
+    # Métrica de Preço Médio (Simplificada para a análise)
     dados["gasolina_media"] = (
         dados["gasolina_comum_preco_revenda_min"]
         + dados["gasolina_comum_preco_revenda_max"]
     ) / 2
-
     dados["diesel_media"] = (
         dados["oleo_diesel_preco_revenda_min"] + dados["oleo_diesel_preco_revenda_max"]
     ) / 2
 
-    # crescimento total
+    # Insight 1: Aumento Acumulado
+    # "Mostramos o quanto o preço mudou do primeiro registro até o último disponível no dataset."
     aumento_gasolina = (
         dados["gasolina_media"].iloc[-1] - dados["gasolina_media"].iloc[0]
     )
     aumento_diesel = dados["diesel_media"].iloc[-1] - dados["diesel_media"].iloc[0]
 
-    print(f"Aumento total gasolina: {aumento_gasolina:.2f}")
-    print(f"Aumento total diesel: {aumento_diesel:.2f}")
+    print(f"\n--- RESUMO DO PERÍODO ---")
+    print(f"Aumento total acumulado Gasolina: R$ {aumento_gasolina:.2f}")
+    print(f"Aumento total acumulado Diesel:   R$ {aumento_diesel:.2f}")
 
-    # variação mês a mês
+    # Insight 2: Volatilidade (Uso do .diff() do Pandas)
+    # "Calculamos a variação mês a mês. Isso ajuda a identificar momentos de crise ou choques de preço."
     dados["var_gasolina"] = dados["gasolina_media"].diff()
     dados["var_diesel"] = dados["diesel_media"].diff()
 
-    # maior e menor aumento
-    print("\nGasolina:")
-    print(dados.loc[dados["var_gasolina"].idxmax()][["data", "var_gasolina"]])
-    print(dados.loc[dados["var_gasolina"].idxmin()][["data", "var_gasolina"]])
+    # Insight 3: Picos Históricos
+    print("\n--- PICOS DE VARIAÇÃO MENSAL ---")
+    idx_max_gas = dados["var_gasolina"].idxmax()
+    print(
+        f"Maior alta Gasolina: {dados.loc[idx_max_gas, 'data'].strftime('%m/%Y')} (R$ {dados.loc[idx_max_gas, 'var_gasolina']:.2f})"
+    )
 
-    print("\nDiesel:")
-    print(dados.loc[dados["var_diesel"].idxmax()][["data", "var_diesel"]])
-    print(dados.loc[dados["var_diesel"].idxmin()][["data", "var_diesel"]])
+    idx_max_die = dados["var_diesel"].idxmax()
+    print(
+        f"Maior alta Diesel:   {dados.loc[idx_max_die, 'data'].strftime('%m/%Y')} (R$ {dados.loc[idx_max_die, 'var_diesel']:.2f})"
+    )
 
-    # gráfico
+    # VISUALIZAÇÃO FINAL:
+    # "O gráfico de linha é a melhor escolha para séries temporais pois mostra claramente
+    # a tendência de alta e a correlação entre os dois combustíveis."
     plt.figure(figsize=(12, 6))
-    plt.plot(dados["data"], dados["gasolina_media"], label="Gasolina")
-    plt.plot(dados["data"], dados["diesel_media"], label="Diesel")
+    plt.plot(
+        dados["data"],
+        dados["gasolina_media"],
+        label="Gasolina Comum",
+        color="#3498db",
+        linewidth=2,
+    )
+    plt.plot(
+        dados["data"],
+        dados["diesel_media"],
+        label="Óleo Diesel",
+        color="#e67e22",
+        linewidth=2,
+    )
 
-    plt.title("Evolução dos preços (Gasolina vs Diesel)")
-    plt.xlabel("Data")
-    plt.ylabel("Preço (R$)")
+    plt.title("Histórico de Preços de Combustíveis no Brasil (Revenda)", fontsize=14)
+    plt.ylabel("Preço Médio (R$)", fontsize=12)
+    plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend()
     plt.xticks(rotation=45)
 
     plt.tight_layout()
-    # plt.show() # Removido para execução em ambiente CLI, mas mantido como comentário
-    plt.savefig("evolucao_precos.png")
-    print("\nGráfico salvo como 'evolucao_precos.png'")
+    
+    # ORGANIZAÇÃO DE SAÍDA:
+    # "Criamos uma pasta de output para manter a raiz do projeto limpa e organizada."
+    os.makedirs('output', exist_ok=True)
+    caminho_grafico = os.path.join('output', 'evolucao_precos.png')
+    plt.savefig(caminho_grafico)
+    print(f"\nVisualização exportada: '{caminho_grafico}' está pronto para ser projetado!")
 
 
-# Fluxo principal
+# -----------------------------------------------------------------------------------
+# EXECUÇÃO (MAIN LOOP)
+# -----------------------------------------------------------------------------------
 if __name__ == "__main__":
-    dados = carregarArquivo("combustiveis-brasil.csv")
-    # CSVs disponíveis: "combustiveis-estados.csv", "combustiveis-regioes.csv", "combustiveis-brasil.csv"
-    if dados is not None:
-        dados = tratamentoArquivo(dados)
-        analiseDados(dados)
+    df_cru = carregarArquivo("combustiveis-brasil.csv")
+    if df_cru is not None:
+        df_limpo = tratamentoArquivo(df_cru)
+        analiseDados(df_limpo)

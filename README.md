@@ -64,15 +64,15 @@ O script `main.py` está estruturado em funções para garantir a organização 
 Abaixo, os principais insights gerados pela ferramenta:
 
 ### 1. Evolução Histórica (Nominal)
-![Evolução de Preços](output/evolucao_precos.png)
+![Evolução de Preços](./assets/evolucao_precos.png)
 > Trajetória dos preços médios de revenda de gasolina e diesel ao longo do tempo.
 
 ### 2. Poder de Compra (Ajustado pelo IPCA)
-![Ajuste de Inflação](output/ajuste_inflacao.png)
+![Ajuste de Inflação](./assets/ajuste_inflacao.png)
 > Comparação entre o preço de "etiqueta" e o preço real ajustado pela inflação (Base 2024), evidenciando o impacto inflacionário.
 
 ### 3. Correlação Gasolina vs Diesel
-![Correlação e Dispersão](output/correlacao_dispersao.png)
+![Correlação e Dispersão](./assets/correlacao_dispersao.png)
 > Análise de dispersão demonstrando a forte dependência linear entre os dois combustíveis.
 
 ## 📂 Dados Utilizados

@@ -17,6 +17,11 @@ def carregarArquivo(nomeArquivo):
             "fidelissauro/combustiveis-brasil",
             nomeArquivo,
         )
+        # Normalização dos nomes das colunas:
+        # 1. 'normalize("NFKD")' decompõe caracteres acentuados (ex: 'á' vira 'a' + '´')
+        # 2. 'encode("ascii", "ignore")' remove os acentos (que não são ASCII)
+        # 3. 'decode("utf-8")' transforma de volta em string comum
+        # 4. 'lower()' garante que todas as colunas sejam minúsculas para facilitar o acesso
         dados.columns = (
             dados.columns.str.normalize("NFKD")
             .str.encode("ascii", errors="ignore")
@@ -45,13 +50,19 @@ def tratamentoArquivo(dados):
         "oleo_diesel_preco_revenda_max",
     ]
     colunas_presentes = [col for col in colunas_desejadas if col in dados.columns]
+
+    # Criamos uma cópia explícita para evitar o aviso 'SettingWithCopyWarning'
     dados = dados[colunas_presentes].copy()
-    dados.dropna(inplace=True)
+    dados = dados.dropna()
 
     if "ano" in dados.columns and "mes" in dados.columns:
-        df_data = pd.DataFrame({"year": dados["ano"], "month": dados["mes"], "day": 1})
-        dados["data"] = pd.to_datetime(df_data)
-        dados.sort_values("data", inplace=True)
+        # O Pandas espera um DataFrame com colunas específicas (year, month, day)
+        # para converter em datetime de forma otimizada.
+        df_temp_data = pd.DataFrame(
+            {"year": dados["ano"], "month": dados["mes"], "day": 1}
+        )
+        dados["data"] = pd.to_datetime(df_temp_data)
+        dados = dados.sort_values("data")
     return dados
 
 
@@ -62,6 +73,7 @@ def calcularIndicadores(dados):
     if dados is None:
         return None
     print("Calculando métricas e indicadores...")
+    # Calculamos a média simples entre o preço mínimo e máximo de revenda
     dados["gasolina_media"] = (
         dados["gasolina_comum_preco_revenda_min"]
         + dados["gasolina_comum_preco_revenda_max"]
@@ -69,6 +81,8 @@ def calcularIndicadores(dados):
     dados["diesel_media"] = (
         dados["oleo_diesel_preco_revenda_min"] + dados["oleo_diesel_preco_revenda_max"]
     ) / 2
+
+    # .diff() calcula a diferença entre a linha atual e a anterior (variação nominal)
     dados["var_gasolina"] = dados["gasolina_media"].diff()
     dados["var_diesel"] = dados["diesel_media"].diff()
     return dados
@@ -82,6 +96,7 @@ def ajustarPelaInflacao(dados):
         return None
     print("Calculando deflatores acumulados (IPCA 1999-2024)...")
 
+    # IPCA Anual (Fonte: IBGE - https://agenciadenoticias.ibge.gov.br/agencia-sala-de-imprensa/2013-agencia-de-noticias/releases/38884-ipca-chega-a-0-56-em-dezembro-e-fecha-o-ano-em-4-62)
     ipca_anual = {
         2024: 4.83,
         2023: 4.62,
@@ -111,6 +126,9 @@ def ajustarPelaInflacao(dados):
         1999: 8.94,
     }
 
+    # Cálculo do multiplicador acumulado:
+    # Para comparar preços de 2001 com 2024, precisamos multiplicar o preço de 2001
+    # por (1 + ipca_2001) * (1 + ipca_2002) ... até (1 + ipca_2023).
     anos = sorted(ipca_anual.keys(), reverse=True)
     multiplicadores = {}
     acumulado = 1.0
@@ -119,6 +137,7 @@ def ajustarPelaInflacao(dados):
         multiplicadores[ano] = acumulado
         acumulado *= 1 + ipca_anual[ano] / 100
 
+    # 'map' aplica o dicionário de multiplicadores com base na coluna 'ano'
     dados["fator_ipca"] = dados["ano"].map(multiplicadores).fillna(1.0)
     dados["gasolina_real"] = dados["gasolina_media"] * dados["fator_ipca"]
     dados["diesel_real"] = dados["diesel_media"] * dados["fator_ipca"]

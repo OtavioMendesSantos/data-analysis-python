@@ -56,9 +56,24 @@ O script `main.py` está estruturado em funções para garantir a organização 
 2.  **Tratamento:** Limpeza de nulos, normalização de colunas e criação de séries temporais.
 3.  **Análise Estatística:**
     *   Cálculo da média de preços de revenda (Mín/Máx).
-    *   Aumento total acumulado no período.
-    *   Identificação dos meses com maior e menor variação de preços.
-4.  **Visualização:** Geração de um gráfico de linha comparativo entre Gasolina e Diesel, salvo automaticamente como `evolucao_precos.png`.
+    *   Cálculo de variação nominal e deflacionada.
+    *   Análise de correlação entre ativos.
+
+## 📈 Visualização de Resultados
+
+Abaixo, os principais insights gerados pela ferramenta:
+
+### 1. Evolução Histórica (Nominal)
+![Evolução de Preços](output/evolucao_precos.png)
+> Trajetória dos preços médios de revenda de gasolina e diesel ao longo do tempo.
+
+### 2. Poder de Compra (Ajustado pelo IPCA)
+![Ajuste de Inflação](output/ajuste_inflacao.png)
+> Comparação entre o preço de "etiqueta" e o preço real ajustado pela inflação (Base 2024), evidenciando o impacto inflacionário.
+
+### 3. Correlação Gasolina vs Diesel
+![Correlação e Dispersão](output/correlacao_dispersao.png)
+> Análise de dispersão demonstrando a forte dependência linear entre os dois combustíveis.
 
 ## 📂 Dados Utilizados
 

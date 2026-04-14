@@ -4,6 +4,7 @@ import kagglehub
 import matplotlib.pyplot as plt
 import pandas as pd
 from kagglehub import KaggleDatasetAdapter
+from sklearn.model_selection import train_test_split
 
 
 # -----------------------------------------------------------------------------------
@@ -144,6 +145,33 @@ def ajustarPelaInflacao(dados):
 
     return dados
 
+
+# -----------------------------------------------------------------------------------
+# SEPARAÇÃO TREINO E TESTE (70% / 30%)
+# -----------------------------------------------------------------------------------
+def separarTreinoTeste(dados):
+    """
+    Esta etapa é crucial para a avaliação de modelos de aprendizado de máquina.
+    Separamos os dados para simular dados que o modelo nunca viu antes.
+    """
+    if dados is None:
+        return None, None
+    print("\nIniciando separação de treino e teste...")
+
+    # Dividimos em 70% treino e 30% teste
+    # random_state garante reprodutibilidade: os mesmos dados sempre serão divididos da mesma forma
+    treino, teste = train_test_split(dados, test_size=0.3, random_state=42)
+
+    print(f"- Total de registros: {len(dados)}")
+    print(f"- Registros para treino (70%): {len(treino)}")
+    print(f"- Registros para teste (30%): {len(teste)}")
+    
+    os.makedirs("output", exist_ok=True)
+    treino.to_csv("output/treino.csv", index=False)
+    teste.to_csv("output/teste.csv", index=False)
+    print("- Arquivos 'treino.csv' e 'teste.csv' gerados em 'output/'.")
+
+    return treino, teste
 
 # -----------------------------------------------------------------------------------
 # VISUALIZAÇÃO - EVOLUÇÃO TEMPORAL
@@ -299,5 +327,7 @@ if __name__ == "__main__":
         gerarGraficoEvolucao(df)
         gerarGraficoInflacao(df)
         gerarGraficoDispersao(df)
+
+        df_treino, df_teste = separarTreinoTeste(df)
 
         print("\nProcessamento concluído com sucesso!")

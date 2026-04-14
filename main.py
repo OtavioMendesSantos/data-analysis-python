@@ -182,7 +182,7 @@ def gerarGraficoEvolucao(dados):
 
     Representação: Este gráfico de linhas ilustra a trajetória dos preços nominais ao longo do tempo.
 
-    Análise Técnica:
+    Análise Técnica:gerarGraficoDispersao
     - Eixos: O eixo X representa a cronologia (2001-2023). O eixo Y o valor de revenda em R$.
     - Tendência: Observamos uma tendência de alta secular, comum em ativos afetados pela inflação.
     - Insight: Serve como base comparativa para as análises de valor real e volatilidade.
@@ -314,6 +314,38 @@ def gerarGraficoDispersao(dados):
 
 
 # -----------------------------------------------------------------------------------
+# VISUALIZAÇÃO - BOXPLOT (DETECÇÃO DE OUTLIERS)
+# -----------------------------------------------------------------------------------
+def gerarBoxPlot(dados):
+    """
+    GRÁFICO BOXPLOT (IDENTIFICAÇÃO DE OUTLIERS)
+
+    Este gráfico é fundamental para responder se existem valores atípicos.
+    - A "caixa" central contém 50% dos dados.
+    - Os pontos acima ou abaixo dos "bigodes" são os outliers.
+
+    Análise: Em combustíveis, os outliers no topo geralmente representam períodos de crise
+    ou picos inflacionários repentinos.
+    """
+    if dados is None:
+        return
+    os.makedirs("output", exist_ok=True)
+
+    print("- Gerando boxplot para detecção de outliers...")
+    plt.figure(figsize=(10, 6))
+    
+    # Criamos o boxplot para Gasolina e Diesel (Preços Reais)
+    dados.boxplot(column=["gasolina_real", "diesel_real"], grid=False, patch_artist=True,
+                 boxprops=dict(facecolor="#ecf0f1", color="#2c3e50"),
+                 medianprops=dict(color="#e74c3c", linewidth=2))
+
+    plt.title("Distribuição e Outliers: Preços Reais (Base 2024)", fontsize=14)
+    plt.ylabel("Preço Ajustado (R$)", fontsize=12)
+    plt.tight_layout()
+    plt.savefig(os.path.join("output", "boxplot_outliers.png"))
+    plt.close()
+
+# -----------------------------------------------------------------------------------
 # EXECUÇÃO (MAIN LOOP)
 # -----------------------------------------------------------------------------------
 if __name__ == "__main__":
@@ -327,6 +359,7 @@ if __name__ == "__main__":
         gerarGraficoEvolucao(df)
         gerarGraficoInflacao(df)
         gerarGraficoDispersao(df)
+        gerarBoxPlot(df)
 
         df_treino, df_teste = separarTreinoTeste(df)
 

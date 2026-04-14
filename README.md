@@ -75,6 +75,10 @@ Abaixo, os principais insights gerados pela ferramenta:
 ![Correlação e Dispersão](./assets/correlacao_dispersao.png)
 > Análise de dispersão demonstrando a forte dependência linear entre os dois combustíveis.
 
+### 4. Distribuição e Outliers (Boxplot)
+![Boxplot de Outliers](./assets/boxplot_outliers.png)
+> Identificação de valores atípicos e distribuição estatística dos preços reais de gasolina e diesel.
+
 ## 📂 Dados Utilizados
 
 O projeto consome o dataset [fidelissauro/combustiveis-brasil](https://www.kaggle.com/datasets/fidelissauro/combustiveis-brasil) via `kagglehub`.

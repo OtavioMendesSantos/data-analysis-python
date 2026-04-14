@@ -1,4 +1,5 @@
 import os
+
 import kagglehub
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -6,50 +7,35 @@ from kagglehub import KaggleDatasetAdapter
 
 
 # -----------------------------------------------------------------------------------
-# FUNÇÃO 1: CARGA DE DADOS (DATA INGESTION)
-# Explicação para Apresentação:
-# "Utilizamos o kagglehub para garantir que o projeto sempre consuma a versão mais recente
-# do dataset oficial, eliminando a necessidade de baixar arquivos manuais (.csv)."
+# CARGA DE DADOS
 # -----------------------------------------------------------------------------------
 def carregarArquivo(nomeArquivo):
     print(f"Iniciando ingestão de dados: {nomeArquivo} via Kaggle API...")
-    dados = None
     try:
         dados = kagglehub.dataset_load(
             KaggleDatasetAdapter.PANDAS,
             "fidelissauro/combustiveis-brasil",
             nomeArquivo,
         )
-
-        # PONTO CHAVE: Normalização de metadados.
-        # " datasets públicos costumam ter acentos e espaços nos nomes das colunas.
-        #   Normalizamos tudo para minúsculo e sem acentos para evitar erros de sintaxe futuros."
         dados.columns = (
             dados.columns.str.normalize("NFKD")
             .str.encode("ascii", errors="ignore")
             .str.decode("utf-8")
             .str.lower()
         )
-
+        return dados
     except Exception as e:
         print(f"Erro na carga de dados: {e}")
-
-    return dados
+        return None
 
 
 # -----------------------------------------------------------------------------------
-# FUNÇÃO 2: TRATAMENTO (DATA WRANGLING)
-# Explicação para Apresentação:
-# "Dados crus raramente estão prontos para análise. Aqui fazemos o 'Slicing' (recorte)
-# apenas do que importa e transformamos tipos de dados genéricos em Séries Temporais."
+# TRATAMENTO
 # -----------------------------------------------------------------------------------
 def tratamentoArquivo(dados):
     if dados is None:
         return None
-
     print("Iniciando tratamento e limpeza de dados...")
-
-    # 1. Filtro de Escopo: Focamos apenas em colunas de Preço de Revenda (consumidor final).
     colunas_desejadas = [
         "ano",
         "mes",
@@ -58,39 +44,24 @@ def tratamentoArquivo(dados):
         "oleo_diesel_preco_revenda_min",
         "oleo_diesel_preco_revenda_max",
     ]
-
     colunas_presentes = [col for col in colunas_desejadas if col in dados.columns]
-    dados = dados[colunas_presentes]
-
-    # 2. Limpeza: Removemos registros incompletos para não distorcer as médias.
+    dados = dados[colunas_presentes].copy()
     dados.dropna(inplace=True)
 
-    # 3. Engenharia de Atributos (Data Transformation):
-    # "Transformamos as colunas separadas de 'ano' e 'mês' em um objeto Datetime legítimo do Pandas.
-    # Isso permite que o Python entenda a cronologia e faça ordenações temporais precisas."
     if "ano" in dados.columns and "mes" in dados.columns:
         df_data = pd.DataFrame({"year": dados["ano"], "month": dados["mes"], "day": 1})
         dados["data"] = pd.to_datetime(df_data)
-        dados.sort_values(
-            "data", inplace=True
-        )  # Garante que o gráfico siga a linha do tempo.
-
+        dados.sort_values("data", inplace=True)
     return dados
 
 
 # -----------------------------------------------------------------------------------
-# FUNÇÃO 3: ANÁLISE E INSIGHTS (DATA ANALYTICS)
-# Explicação para Apresentação:
-# "Aqui transformamos dados em informação. Calculamos a inflação dos combustíveis
-# no período e identificamos picos históricos de variação (volatilidade)."
+# CÁLCULO DE INDICADORES
 # -----------------------------------------------------------------------------------
-def analiseDados(dados):
+def calcularIndicadores(dados):
     if dados is None:
-        return
-
-    print("Gerando indicadores e visualizações...")
-
-    # Métrica de Preço Médio (Simplificada para a análise)
+        return None
+    print("Calculando métricas e indicadores...")
     dados["gasolina_media"] = (
         dados["gasolina_comum_preco_revenda_min"]
         + dados["gasolina_comum_preco_revenda_max"]
@@ -98,75 +69,216 @@ def analiseDados(dados):
     dados["diesel_media"] = (
         dados["oleo_diesel_preco_revenda_min"] + dados["oleo_diesel_preco_revenda_max"]
     ) / 2
-
-    # Insight 1: Aumento Acumulado
-    # "Mostramos o quanto o preço mudou do primeiro registro até o último disponível no dataset."
-    aumento_gasolina = (
-        dados["gasolina_media"].iloc[-1] - dados["gasolina_media"].iloc[0]
-    )
-    aumento_diesel = dados["diesel_media"].iloc[-1] - dados["diesel_media"].iloc[0]
-
-    print(f"\n--- RESUMO DO PERÍODO ---")
-    print(f"Aumento total acumulado Gasolina: R$ {aumento_gasolina:.2f}")
-    print(f"Aumento total acumulado Diesel:   R$ {aumento_diesel:.2f}")
-
-    # Insight 2: Volatilidade (Uso do .diff() do Pandas)
-    # "Calculamos a variação mês a mês. Isso ajuda a identificar momentos de crise ou choques de preço."
     dados["var_gasolina"] = dados["gasolina_media"].diff()
     dados["var_diesel"] = dados["diesel_media"].diff()
+    return dados
 
-    # Insight 3: Picos Históricos
-    print("\n--- PICOS DE VARIAÇÃO MENSAL ---")
-    idx_max_gas = dados["var_gasolina"].idxmax()
-    print(
-        f"Maior alta Gasolina: {dados.loc[idx_max_gas, 'data'].strftime('%m/%Y')} (R$ {dados.loc[idx_max_gas, 'var_gasolina']:.2f})"
-    )
 
-    idx_max_die = dados["var_diesel"].idxmax()
-    print(
-        f"Maior alta Diesel:   {dados.loc[idx_max_die, 'data'].strftime('%m/%Y')} (R$ {dados.loc[idx_max_die, 'var_diesel']:.2f})"
-    )
+# -----------------------------------------------------------------------------------
+# AJUSTE PELA INFLAÇÃO
+# -----------------------------------------------------------------------------------
+def ajustarPelaInflacao(dados):
+    if dados is None:
+        return None
+    print("Calculando deflatores acumulados (IPCA 1999-2024)...")
 
-    # VISUALIZAÇÃO FINAL:
-    # "O gráfico de linha é a melhor escolha para séries temporais pois mostra claramente
-    # a tendência de alta e a correlação entre os dois combustíveis."
+    ipca_anual = {
+        2024: 4.83,
+        2023: 4.62,
+        2022: 5.79,
+        2021: 10.06,
+        2020: 4.52,
+        2019: 4.31,
+        2018: 3.75,
+        2017: 2.95,
+        2016: 6.29,
+        2015: 10.67,
+        2014: 6.41,
+        2013: 5.91,
+        2012: 5.84,
+        2011: 6.50,
+        2010: 5.91,
+        2009: 4.31,
+        2008: 5.90,
+        2007: 4.46,
+        2006: 3.14,
+        2005: 5.69,
+        2004: 7.60,
+        2003: 9.30,
+        2002: 12.53,
+        2001: 7.67,
+        2000: 5.97,
+        1999: 8.94,
+    }
+
+    anos = sorted(ipca_anual.keys(), reverse=True)
+    multiplicadores = {}
+    acumulado = 1.0
+
+    for ano in anos:
+        multiplicadores[ano] = acumulado
+        acumulado *= 1 + ipca_anual[ano] / 100
+
+    dados["fator_ipca"] = dados["ano"].map(multiplicadores).fillna(1.0)
+    dados["gasolina_real"] = dados["gasolina_media"] * dados["fator_ipca"]
+    dados["diesel_real"] = dados["diesel_media"] * dados["fator_ipca"]
+
+    return dados
+
+
+# -----------------------------------------------------------------------------------
+# VISUALIZAÇÃO - EVOLUÇÃO TEMPORAL
+# -----------------------------------------------------------------------------------
+def gerarGraficoEvolucao(dados):
+    """
+    GRÁFICO DE EVOLUÇÃO TEMPORAL (TIME SERIES)
+
+    Representação: Este gráfico de linhas ilustra a trajetória dos preços nominais ao longo do tempo.
+
+    Análise Técnica:
+    - Eixos: O eixo X representa a cronologia (2001-2023). O eixo Y o valor de revenda em R$.
+    - Tendência: Observamos uma tendência de alta secular, comum em ativos afetados pela inflação.
+    - Insight: Serve como base comparativa para as análises de valor real e volatilidade.
+    """
+    if dados is None:
+        return
+    os.makedirs("output", exist_ok=True)
+
+    print("- Gerando gráfico de evolução temporal...")
     plt.figure(figsize=(12, 6))
     plt.plot(
         dados["data"],
         dados["gasolina_media"],
-        label="Gasolina Comum",
+        label="Gasolina (Nominal)",
         color="#3498db",
         linewidth=2,
     )
     plt.plot(
         dados["data"],
         dados["diesel_media"],
-        label="Óleo Diesel",
+        label="Diesel (Nominal)",
         color="#e67e22",
         linewidth=2,
     )
-
-    plt.title("Histórico de Preços de Combustíveis no Brasil (Revenda)", fontsize=14)
-    plt.ylabel("Preço Médio (R$)", fontsize=12)
-    plt.grid(True, linestyle="--", alpha=0.7)
+    plt.title("Histórico de Preços de Combustíveis no Brasil (Nominal)", fontsize=14)
+    plt.ylabel("Preço de Revenda (R$)", fontsize=12)
+    plt.grid(True, linestyle="--", alpha=0.3)
     plt.legend()
     plt.xticks(rotation=45)
-
     plt.tight_layout()
-    
-    # ORGANIZAÇÃO DE SAÍDA:
-    # "Criamos uma pasta de output para manter a raiz do projeto limpa e organizada."
-    os.makedirs('output', exist_ok=True)
-    caminho_grafico = os.path.join('output', 'evolucao_precos.png')
-    plt.savefig(caminho_grafico)
-    print(f"\nVisualização exportada: '{caminho_grafico}' está pronto para ser projetado!")
+    plt.savefig(os.path.join("output", "evolucao_precos.png"))
+    plt.close()
+
+
+# -----------------------------------------------------------------------------------
+# VISUALIZAÇÃO - AJUSTE PELA INFLAÇÃO
+# -----------------------------------------------------------------------------------
+def gerarGraficoInflacao(dados):
+    """
+    GRÁFICO DE AJUSTE PELA INFLAÇÃO (PODER DE COMPRA REAL)
+
+    Este gráfico é o "divisor de águas" da análise econométrica, pois desconta a desvalorização
+    da moeda para mostrar o custo real do combustível ao longo das décadas.
+
+    Análise Técnica:
+    - Preço Nominal (Linha Cinza Pontilhada): Representa o valor "de etiqueta" que o consumidor
+      via na bomba em cada época.
+    - Preço Real (Linha Verde Sólida): Representa o custo da época recalculado para o poder
+      de compra de Janeiro de 2024, utilizando o IPCA acumulado.
+    - Área Sombreada: Ilustra visualmente o "imposto inflacionário" ou a perda de valor
+      substancial do Real frente ao tempo.
+
+    Insight Econômico: Se a linha verde estiver caindo ou estável enquanto a cinza sobe,
+    significa que o aumento percebido pelo brasileiro é puramente inflacionário (perda de valor da moeda).
+    Se ambas as linhas sobem juntas, houve um aumento real de custo (ex: crises internacionais de petróleo).
+    """
+    if dados is None:
+        return
+    os.makedirs("output", exist_ok=True)
+
+    print("- Gerando gráfico de ajuste pela inflação...")
+    plt.figure(figsize=(12, 6))
+    plt.plot(
+        dados["data"],
+        dados["gasolina_real"],
+        label="Gasolina (Preço Real - IPCA)",
+        color="#27ae60",
+        linewidth=2,
+    )
+    plt.plot(
+        dados["data"],
+        dados["gasolina_media"],
+        label="Gasolina (Preço de Etiqueta)",
+        color="#bdc3c7",
+        linestyle="--",
+    )
+    plt.fill_between(
+        dados["data"],
+        dados["gasolina_media"],
+        dados["gasolina_real"],
+        color="#27ae60",
+        alpha=0.1,
+    )
+
+    plt.title("Poder de Compra: Preço Real da Gasolina (Base 2024)", fontsize=14)
+    plt.ylabel("R$ (Ajustado pelo IPCA)", fontsize=12)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join("output", "ajuste_inflacao.png"))
+    plt.close()
+
+
+# -----------------------------------------------------------------------------------
+# VISUALIZAÇÃO - CORRELAÇÃO DE DISPERSÃO
+# -----------------------------------------------------------------------------------
+def gerarGraficoDispersao(dados):
+    """
+    GRÁFICO DE DISPERSÃO (SCATTER PLOT)
+
+    Representação: Este gráfico ilustra a relação direta entre os preços da gasolina e do diesel.
+
+    Análise Técnica:
+    - Eixos: O eixo X representa a gasolina, e o eixo Y o diesel (R$).
+    - Tendência Visual: Os pontos formam uma linha reta ascendente, indicando alta proporcionalidade.
+    - Coeficiente de Pearson: O valor próximo de 0.99 indica uma correlação linear positiva quase perfeita.
+
+    Resumo: Demonstra que os preços estão fortemente atrelados; as variações de um refletem quase
+    perfeitamente no outro devido à política de preços e fatores macroeconômicos.
+    """
+    if dados is None:
+        return
+    os.makedirs("output", exist_ok=True)
+
+    print("- Gerando gráfico de dispersão e correlação...")
+    correlacao = dados["gasolina_media"].corr(dados["diesel_media"])
+    plt.figure(figsize=(8, 8))
+    plt.scatter(
+        dados["gasolina_media"], dados["diesel_media"], alpha=0.5, color="#2ecc71"
+    )
+
+    plt.title(f"Dispersão Gasolina vs Diesel (Pearson: {correlacao:.4f})", fontsize=14)
+    plt.xlabel("Preço Gasolina (R$)", fontsize=12)
+    plt.ylabel("Preço Diesel (R$)", fontsize=12)
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join("output", "correlacao_dispersao.png"))
+    plt.close()
 
 
 # -----------------------------------------------------------------------------------
 # EXECUÇÃO (MAIN LOOP)
 # -----------------------------------------------------------------------------------
 if __name__ == "__main__":
-    df_cru = carregarArquivo("combustiveis-brasil.csv")
-    if df_cru is not None:
-        df_limpo = tratamentoArquivo(df_cru)
-        analiseDados(df_limpo)
+    df = carregarArquivo("combustiveis-brasil.csv")
+    if df is not None:
+        df = tratamentoArquivo(df)
+        df = calcularIndicadores(df)
+        df = ajustarPelaInflacao(df)
+
+        print("\nGerando visualizações em 'output/'...")
+        gerarGraficoEvolucao(df)
+        gerarGraficoInflacao(df)
+        gerarGraficoDispersao(df)
+
+        print("\nProcessamento concluído com sucesso!")
